@@ -17,6 +17,7 @@ bool TemperatureSensor::setup()
     static bool doOnce = true;
 
     if (doOnce) {
+        doOnce = false;
         // Initialize the BME280 sensor
         return sensor.begin();
     }
