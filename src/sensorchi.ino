@@ -6,6 +6,7 @@
  */
 
 #include "ble_logger.h"
+#include "humidity_sensor.h"
 #include "temperature_sensor.h"
 
 #include "Particle.h"
@@ -14,6 +15,7 @@
 // initialized until you've already connected to the cloud, which is not as useful.
 SYSTEM_THREAD(ENABLED);
 
+HumiditySensor humidity_sensor;
 TemperatureSensor temp_sensor;
 
 // This sets up the BLE log handler. The <4096> template parameter sets the size of the buffer to hold log data
@@ -27,17 +29,13 @@ BleLogging<4096> bleLogHandler(LOG_LEVEL_INFO);
 // This is just so the demo prints a message every second so the log updates frequently
 const unsigned long LOG_INTERVAL = 5000; // milliseconds
 unsigned long lastLog = 0;
-float temp = 0;
+float temp = 0, humidity = 0;
 
 // setup() runs once, when the device is first turned on.
 void setup() {
     BLE.on();
 
     bleLogHandler.setup();
-
-    if (!temp_sensor.setup())
-      Log.error("Failed to set up temp sensor");
-
 }
 
 // loop() runs over and over again, as quickly as it can execute.
@@ -49,14 +47,17 @@ void loop() {
 
         temp_sensor.setTemperatureUnits(TemperatureSensor::TemperatureUnits::Celcius);
         temp = temp_sensor.read();
-        Log.info("temp = %0.0fC", temp);
+        Log.info("t = %0.0fC", temp);
 
         temp_sensor.setTemperatureUnits(TemperatureSensor::TemperatureUnits::Fahrenheit);
         temp = temp_sensor.read();
-        Log.info("temp = %0.1fF", temp);
+        Log.info("t = %0.1fF", temp);
 
         temp_sensor.setTemperatureUnits(TemperatureSensor::TemperatureUnits::Kelvin);
         temp = temp_sensor.read();
-        Log.info("temp = %0.2fK", temp);
+        Log.info("t = %0.2fK", temp);
+
+        humidity = humidity_sensor.read();
+        Log.info("h = %0.1f percent", humidity);
     }
 }
