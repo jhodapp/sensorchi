@@ -6,6 +6,7 @@
  */
 
 #include "ble_logger.h"
+#include "air_purity_sensor.h"
 #include "humidity_sensor.h"
 #include "temperature_sensor.h"
 
@@ -15,6 +16,7 @@
 // initialized until you've already connected to the cloud, which is not as useful.
 SYSTEM_THREAD(ENABLED);
 
+AirPuritySensor air_purity_sensor;
 HumiditySensor humidity_sensor;
 TemperatureSensor temp_sensor;
 
@@ -30,6 +32,7 @@ BleLogging<4096> bleLogHandler(LOG_LEVEL_INFO);
 const unsigned long LOG_INTERVAL = 5000; // milliseconds
 unsigned long lastLog = 0;
 float temp = 0, humidity = 0;
+String air_purity;
 
 // setup() runs once, when the device is first turned on.
 void setup() {
@@ -59,5 +62,8 @@ void loop() {
 
         humidity = humidity_sensor.read();
         Log.info("h = %0.1f percent", humidity);
+
+        air_purity = air_purity_sensor.read_str();
+        Log.info("ap = %s", air_purity.c_str());
     }
 }
