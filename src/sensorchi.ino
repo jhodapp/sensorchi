@@ -11,6 +11,7 @@
 #include "temperature_sensor.h"
 
 #include "Particle.h"
+#include "SeeedOLED.h"
 
 // This firmware works better with system thread enabled, otherwise it is not
 // initialized until you've already connected to the cloud, which is not as useful.
@@ -34,11 +35,24 @@ unsigned long lastLog = 0;
 float temp = 0, humidity = 0;
 String air_purity;
 
+static void DisplayOledSplash();
+static void DisplayOledReadings();
+static void LogReadings();
+static void ReadSensors();
+
 // setup() runs once, when the device is first turned on.
 void setup() {
     BLE.on();
-
     bleLogHandler.setup();
+
+    // I2C bus init for use with OLED display
+    Wire.begin();
+    SeeedOled.init();
+    SeeedOled.clearDisplay();
+    SeeedOled.setNormalDisplay();
+    SeeedOled.setPageMode();
+
+    DisplayOledSplash();
 }
 
 // loop() runs over and over again, as quickly as it can execute.
@@ -48,22 +62,51 @@ void loop() {
     if (millis() - lastLog >= LOG_INTERVAL) {
         lastLog = millis();
 
-        temp_sensor.setTemperatureUnits(TemperatureSensor::TemperatureUnits::Celcius);
-        temp = temp_sensor.read();
-        Log.info("t = %0.0fC", temp);
-
-        temp_sensor.setTemperatureUnits(TemperatureSensor::TemperatureUnits::Fahrenheit);
-        temp = temp_sensor.read();
-        Log.info("t = %0.1fF", temp);
-
-        temp_sensor.setTemperatureUnits(TemperatureSensor::TemperatureUnits::Kelvin);
-        temp = temp_sensor.read();
-        Log.info("t = %0.2fK", temp);
-
-        humidity = humidity_sensor.read();
-        Log.info("h = %0.1f percent", humidity);
-
-        air_purity = air_purity_sensor.read_str();
-        Log.info("ap = %s", air_purity.c_str());
+        ReadSensors();
+        LogReadings();
+        DisplayOledReadings();
     }
+}
+
+static void DisplayOledSplash()
+{
+    SeeedOled.setTextXY(3, 0);
+    SeeedOled.putString("Air Quality");
+    SeeedOled.setTextXY(4, 0);
+    SeeedOled.putString("Monitor");
+}
+
+static void DisplayOledReadings()
+{
+  SeeedOled.clearDisplay();
+
+  SeeedOled.setTextXY(1, 0);
+  SeeedOled.putString("Temp: ");
+  SeeedOled.putNumber(temp);
+  SeeedOled.putString("C");
+
+  SeeedOled.setTextXY(2, 0);
+  SeeedOled.putString("Humidity: ");
+  SeeedOled.putNumber(humidity);
+  SeeedOled.putString("%");
+
+  SeeedOled.setTextXY(4, 0);
+  SeeedOled.putString(air_purity);
+}
+
+static void LogReadings()
+{
+    Log.info("temp: %0.0fC", temp);
+    Log.info("humidity: %0.1f percent", humidity);
+    Log.info(air_purity.c_str());
+}
+
+static void ReadSensors()
+{
+    temp_sensor.setTemperatureUnits(TemperatureSensor::TemperatureUnits::Celcius);
+    temp = temp_sensor.read();
+
+    humidity = humidity_sensor.read();
+
+    air_purity = air_purity_sensor.read_str();
 }
