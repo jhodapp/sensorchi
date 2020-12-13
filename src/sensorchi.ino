@@ -5,8 +5,9 @@
  * Date: 12/2/20
  */
 
-#include "ble_logger.h"
 #include "air_purity_sensor.h"
+#include "ble_logger.h"
+#include "dust_sensor.h"
 #include "humidity_sensor.h"
 #include "temperature_sensor.h"
 
@@ -18,6 +19,7 @@
 SYSTEM_THREAD(ENABLED);
 
 AirPuritySensor air_purity_sensor;
+DustSensor dust_sensor;
 HumiditySensor humidity_sensor;
 TemperatureSensor temp_sensor;
 
@@ -32,7 +34,7 @@ BleLogging<4096> bleLogHandler(LOG_LEVEL_INFO);
 // This is just so the demo prints a message every second so the log updates frequently
 const unsigned long LOG_INTERVAL = 5000; // milliseconds
 unsigned long lastLog = 0;
-float temp = 0, humidity = 0;
+float temp = 0, humidity = 0, dust_concentration = 0;
 String air_purity;
 
 static void DisplayOledSplash();
@@ -90,7 +92,12 @@ static void DisplayOledReadings()
   SeeedOled.putNumber(humidity);
   SeeedOled.putString("%");
 
-  SeeedOled.setTextXY(4, 0);
+  SeeedOled.setTextXY(3, 0);
+  SeeedOled.putString("Dust: ");
+  SeeedOled.putNumber(dust_concentration);
+  SeeedOled.putString(" pcs/L");
+
+  SeeedOled.setTextXY(5, 0);
   SeeedOled.putString(air_purity);
 }
 
@@ -98,6 +105,7 @@ static void LogReadings()
 {
     Log.info("temp: %0.0fC", temp);
     Log.info("humidity: %0.1f percent", humidity);
+    Log.info("dust: %0.1f pcs/L", dust_concentration);
     Log.info(air_purity.c_str());
 }
 
@@ -109,4 +117,6 @@ static void ReadSensors()
     humidity = humidity_sensor.read();
 
     air_purity = air_purity_sensor.read_str();
+
+    dust_concentration = dust_sensor.read();
 }
