@@ -11,6 +11,7 @@
 #include "humidity_sensor.h"
 #include "temperature_sensor.h"
 
+#include "JsonParserGeneratorRK.h"
 #include "Particle.h"
 #include "SeeedOLED.h"
 
@@ -32,15 +33,17 @@ BleLogging<4096> bleLogHandler(LOG_LEVEL_INFO);
 //SerialLogHandler serialLogHandler(LOG_LEVEL_TRACE);
 
 // This is just so the demo prints a message every second so the log updates frequently
-const unsigned long LOG_INTERVAL = 5000; // milliseconds
+const unsigned long LOG_INTERVAL = 2000; // milliseconds
 unsigned long lastLog = 0;
 float temp = 0, humidity = 0, dust_concentration = 0;
+int pressure = 0;
 String air_purity;
 
 static void DisplayOledSplash();
 static void DisplayOledReadings();
 static void LogReadings();
 static void ReadSensors();
+static void CreateAndSendEventPayload(float temp, float humidity, int pressure, float dust_concentration, const String &air_purity);
 
 // setup() runs once, when the device is first turned on.
 void setup() {
@@ -67,6 +70,7 @@ void loop() {
         ReadSensors();
         LogReadings();
         DisplayOledReadings();
+        CreateAndSendEventPayload(temp, humidity, pressure, dust_concentration, air_purity);
     }
 }
 
@@ -119,4 +123,21 @@ static void ReadSensors()
     air_purity = air_purity_sensor.read_str();
 
     dust_concentration = dust_sensor.read();
+}
+
+static void CreateAndSendEventPayload(float temp, float humidity, int pressure, float dust_concentration, const String &air_purity)
+{
+    JsonWriterStatic<256> jw;
+
+    {
+        JsonWriterAutoObject obj(&jw);
+
+        jw.insertKeyValue("temp", temp);
+        jw.insertKeyValue("humidity", humidity);
+        jw.insertKeyValue("pressure", pressure);
+        jw.insertKeyValue("dust-concentration", dust_concentration);
+        jw.insertKeyValue("air-purity", air_purity);
+    }
+
+    Particle.publish("sensor-readings", jw.getBuffer(), PRIVATE);
 }
