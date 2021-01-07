@@ -7,14 +7,13 @@
 
 #include "air_purity_sensor.h"
 #include "dust_sensor.h"
+#include "http_client.h"
 #include "humidity_sensor.h"
 #include "temperature_sensor.h"
 
 #include "JsonParserGeneratorRK.h"
 #include "Particle.h"
 #include "SeeedOLED.h"
-
-#define USE_JSON_PAYLOAD
 
 // This firmware works better with system thread enabled, otherwise it is not
 // initialized until you've already connected to the cloud, which is not as useful.
@@ -27,7 +26,8 @@ TemperatureSensor temp_sensor;
 
 SerialLogHandler serialLogHandler(LOG_LEVEL_INFO);
 
-TCPClient client;
+const byte server[] = { 10, 0, 1, 13 };
+HttpClient http_client(server, 4000);
 
 const unsigned long PUSH_SENSOR_DATA_INTERVAL = 5000; // milliseconds
 unsigned long lastPushSensorData = 0;
@@ -35,7 +35,6 @@ float temp = 0, humidity = 0, dust_concentration = 0;
 int pressure = 0;
 String air_purity;
 
-static void DisplayOledSplash();
 static void DisplayOledReadings();
 static void LogReadings();
 static void ReadSensors();
@@ -49,6 +48,8 @@ void setup() {
     SeeedOled.clearDisplay();
     SeeedOled.setNormalDisplay();
     SeeedOled.setPageMode();
+
+    http_client.setEnpoint("/api/sensors");
 
     Log.info("Setup complete.");
 }
@@ -64,18 +65,10 @@ void loop() {
         CreateAndSendSensorsLocal();
     }
 
-    if (client.available()) {
-        const char c = client.read();
+    if (http_client.available()) {
+        const char c = http_client.read();
         Serial.print(c);
     }
-}
-
-static void DisplayOledSplash()
-{
-    SeeedOled.setTextXY(3, 0);
-    SeeedOled.putString("Air Quality");
-    SeeedOled.setTextXY(4, 0);
-    SeeedOled.putString("Monitor");
 }
 
 static void DisplayOledReadings()
@@ -105,6 +98,7 @@ static void DisplayOledReadings()
 
 static void LogReadings()
 {
+    Log.info("");
     Log.info("temp: %0.0fC", temp);
     Log.info("humidity: %0.1f percent", humidity);
     Log.info("dust: %0.1f pcs/L", dust_concentration);
@@ -125,11 +119,9 @@ static void ReadSensors()
 
 static void CreateAndSendSensorsLocal()
 {
-    const byte server[] = { 10, 0, 1, 13 };
-
-    if (client.connect(server, 4000))
+    if (http_client.connect())
     {
-        JsonWriterStatic<256> jw;
+        JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
         {
             JsonWriterAutoObject obj(&jw);
             jw.insertKeyValue("temp", temp);
@@ -140,28 +132,8 @@ static void CreateAndSendSensorsLocal()
         Log.info("ip address: %s", WiFi.localIP().toString().c_str());
         Log.info("gateway: %s", WiFi.gatewayIP().toString().c_str());
 
-        Log.info("Sending POST request:");
-        Log.info("POST /sensors HTTP/1.1");
-        Log.info("User-Agent: argon/0.0.1");
-        Log.info("Accept: */*");
-        Log.info("Content-Type: application/json");
-        Log.info("Content-Length: %d", 39);
-        //Log.info("Content-Length: %d", jw.getBufferLen());
-        Log.info(jw.getBuffer());
-
-        client.print("POST /api/sensors HTTP/1.1\r\n");
-        client.print("Host: 10.0.1.13:4000\r\n");
-        client.print("User-Agent: argon/0.0.1\r\n");
-        client.print("Accept: */*\r\n");
-        client.print("Content-Type: application/json\r\n");
-        client.print("Content-Length: ");
-        client.print(39);
-        //client.print(jw.getBufferLen());
-        client.print("\r\n");
-        client.print("\r\n");
-        client.print(jw.getBuffer());
-        client.print("\r\n");
+        http_client.sendJson(jw);
     } else {
-        Log.error("TCPClient could not connect to endpoint");
+        Log.error("http_client could not connect to server endpoint");
     }
 }
