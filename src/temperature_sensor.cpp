@@ -1,28 +1,13 @@
 #include "temperature_sensor.h"
 
-#include "Particle.h"
-
 TemperatureSensor::TemperatureSensor()
     : temperature_units(TemperatureUnits::Celcius)
 {
-    setup();
+    BaseSensor::setup();
 }
 
 TemperatureSensor::~TemperatureSensor()
 {
-}
-
-bool TemperatureSensor::setup()
-{
-    static bool doOnce = true;
-
-    if (doOnce) {
-        doOnce = false;
-        // Initialize the BME280 sensor
-        return sensor.begin();
-    }
-
-    return false;
 }
 
 float TemperatureSensor::read(bool mock_data)
@@ -38,7 +23,7 @@ float TemperatureSensor::read(bool mock_data)
         }
     } else {
         // Read from the BME280 sensor
-        lastValue = sensor.readTemperature();
+        lastValue = BaseSensor::sensor().readTemperature();
     }
 
     return convertUnits(lastValue);

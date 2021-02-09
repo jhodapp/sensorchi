@@ -9,6 +9,7 @@
 #include "dust_sensor.h"
 #include "http_client.h"
 #include "humidity_sensor.h"
+#include "pressure_sensor.h"
 #include "temperature_sensor.h"
 
 #include "JsonParserGeneratorRK.h"
@@ -22,11 +23,22 @@ SYSTEM_THREAD(ENABLED);
 AirPuritySensor air_purity_sensor;
 DustSensor dust_sensor;
 HumiditySensor humidity_sensor;
+PressureSensor pressure_sensor;
 TemperatureSensor temp_sensor;
 
 SerialLogHandler serialLogHandler(LOG_LEVEL_INFO);
 
-const byte server[] = { 10, 0, 1, 13 };
+// TODO: set this in from particle compile command line
+#define DEV_DEPLOYMENT
+
+#ifdef DEV_DEPLOYMENT
+    const byte server[] = { 10, 0, 1, 3 };
+#endif
+
+#ifdef PROD_DEPLOYMENT
+    const byte server[] = { 10, 0, 1, 2 };
+#endif
+
 HttpClient http_client(server, 4000);
 
 const unsigned long PUSH_SENSOR_DATA_INTERVAL = 5000; // milliseconds
@@ -38,7 +50,7 @@ String air_purity;
 static void DisplayOledReadings();
 static void LogReadings();
 static void ReadSensors();
-static void CreateAndSendSensorsLocal();
+static void CreateAndSendSensorPayload();
 
 // setup() runs once, when the device is first turned on.
 void setup() {
@@ -49,7 +61,10 @@ void setup() {
     SeeedOled.setNormalDisplay();
     SeeedOled.setPageMode();
 
-    http_client.setEnpoint("/api/sensors");
+    http_client.setEnpoint("/api/readings/add");
+
+    while (!WiFi.ready());
+    http_client.connect();
 
     Log.info("Setup complete.");
 }
@@ -62,7 +77,7 @@ void loop() {
         ReadSensors();
         DisplayOledReadings();
         LogReadings();
-        CreateAndSendSensorsLocal();
+        CreateAndSendSensorPayload();
     }
 
     if (http_client.available()) {
@@ -87,6 +102,12 @@ static void DisplayOledReadings()
 
   SeeedOled.setTextXY(3, 0);
   SeeedOled.putString("                ");
+  SeeedOled.putString("Pressure: ");
+  SeeedOled.putNumber(pressure);
+  SeeedOled.putString(" mb");
+
+  SeeedOled.setTextXY(4, 0);
+  SeeedOled.putString("                ");
   SeeedOled.putString("Dust: ");
   SeeedOled.putNumber(dust_concentration);
   SeeedOled.putString(" pcs/L");
@@ -98,9 +119,10 @@ static void DisplayOledReadings()
 
 static void LogReadings()
 {
-    Log.info("");
+    //Log.info("");
     Log.info("temp: %0.0fC", temp);
     Log.info("humidity: %0.1f percent", humidity);
+    Log.info("pressure: %d mb", pressure);
     Log.info("dust: %0.1f pcs/L", dust_concentration);
     Log.info(air_purity.c_str());
 }
@@ -112,20 +134,28 @@ static void ReadSensors()
 
     humidity = humidity_sensor.read();
 
+    pressure = static_cast<int>(pressure_sensor.read());
+
     air_purity = air_purity_sensor.read_str();
 
     dust_concentration = dust_sensor.read();
 }
 
-static void CreateAndSendSensorsLocal()
+static void CreateAndSendSensorPayload()
 {
-    if (http_client.connect())
+    if (!http_client.connected())
+        http_client.connect();
+
+    if (http_client.connected())
     {
         JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
         {
             JsonWriterAutoObject obj(&jw);
-            jw.insertKeyValue("temp", temp);
+            jw.insertKeyValue("temperature", temp);
             jw.insertKeyValue("humidity", humidity);
+            jw.insertKeyValue("pressure", pressure);
+            jw.insertKeyValue("dust_concentration", dust_concentration);
+            jw.insertKeyValue("air_purity", air_purity);
         }
 
         Log.info("TCPClient connected");
@@ -134,6 +164,6 @@ static void CreateAndSendSensorsLocal()
 
         http_client.sendJson(jw);
     } else {
-        Log.error("http_client could not connect to server endpoint");
+        Log.error("http_client not connected to server");
     }
 }

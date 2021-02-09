@@ -1,28 +1,28 @@
-#include "humidity_sensor.h"
+#include "pressure_sensor.h"
 
-HumiditySensor::HumiditySensor()
+PressureSensor::PressureSensor()
 {
     BaseSensor::setup();
 }
 
-HumiditySensor::~HumiditySensor()
+PressureSensor::~PressureSensor()
 {
 }
 
-float HumiditySensor::read(bool mock_data)
+float PressureSensor::read(bool mock_data)
 {
     static float lastValue = 0;
     if (mock_data) {
         // Adjust this by a little bit each check so we can see it change
         if (rand() > (RAND_MAX / 2)) {
-            lastValue += 5.1;
+            lastValue += 0.1;
         }
         else {
-            lastValue -= 5.1;
+            lastValue -= 0.1;
         }
     } else {
         // Read from the BME280 sensor
-        lastValue = BaseSensor::sensor().readHumidity();
+        lastValue = BaseSensor::sensor().readPressure() / 100.0F;
     }
 
     return lastValue;
