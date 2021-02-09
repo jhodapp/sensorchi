@@ -6,7 +6,9 @@
 #include "Particle.h"
 
 #define JSON_WRITER_BUFFER_SIZE 256
+#define RESPONSE_BUFFER_SIZE 500
 
+// FIXME: consider inheriting from TCPClient instead of containing one
 class HttpClient
 {
     public:
@@ -15,6 +17,7 @@ class HttpClient
         ~HttpClient();
 
         bool connect();
+        bool connected();
         bool available();
         const char read();
 
@@ -28,6 +31,7 @@ class HttpClient
         HttpClient();
 
         uint16_t payloadLength(const JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> &json);
+        bool httpResponseEnd();
 
     private:
         TCPClient client;
@@ -36,6 +40,11 @@ class HttpClient
         uint16_t port;
         bool use_host;
         String endpoint;
+
+        //char *response_buf;
+        char response_buf[RESPONSE_BUFFER_SIZE];
+        uint16_t buf_idx;
+        bool received_full_response;
 };
 
 #endif
