@@ -28,18 +28,11 @@ TemperatureSensor temp_sensor;
 
 SerialLogHandler serialLogHandler(LOG_LEVEL_INFO);
 
-// TODO: set this in from particle compile command line
-#define DEV_DEPLOYMENT
+const byte dev_server[] = { 10, 0, 1, 3 };
+const byte prod_server[] = { 10, 0, 1, 2 };
 
-#ifdef DEV_DEPLOYMENT
-    const byte server[] = { 10, 0, 1, 3 };
-#endif
-
-#ifdef PROD_DEPLOYMENT
-    const byte server[] = { 10, 0, 1, 2 };
-#endif
-
-HttpClient http_client(server, 4000);
+HttpClient http_client_dev(dev_server, 4000);
+HttpClient http_client_prod(prod_server, 4000);
 
 const unsigned long PUSH_SENSOR_DATA_INTERVAL = 5000; // milliseconds
 unsigned long lastPushSensorData = 0;
@@ -61,10 +54,12 @@ void setup() {
     SeeedOled.setNormalDisplay();
     SeeedOled.setPageMode();
 
-    http_client.setEnpoint("/api/readings/add");
+    http_client_dev.setEnpoint("/api/readings/add");
+    http_client_prod.setEnpoint("/api/readings/add");
 
     while (!WiFi.ready());
-    http_client.connect();
+    http_client_dev.connect();
+    http_client_prod.connect();
 
     Log.info("Setup complete.");
 }
@@ -80,8 +75,13 @@ void loop() {
         CreateAndSendSensorPayload();
     }
 
-    if (http_client.available()) {
-        const char c = http_client.read();
+    if (http_client_dev.available()) {
+        const char c = http_client_dev.read();
+        Serial.print(c);
+    }
+
+    if (http_client_prod.available()) {
+        const char c = http_client_prod.read();
         Serial.print(c);
     }
 }
@@ -143,10 +143,13 @@ static void ReadSensors()
 
 static void CreateAndSendSensorPayload()
 {
-    if (!http_client.connected())
-        http_client.connect();
+    if (!http_client_dev.connected())
+        http_client_dev.connect();
 
-    if (http_client.connected())
+    if (!http_client_prod.connected())
+        http_client_prod.connect();
+
+    if (http_client_dev.connected())
     {
         JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
         {
@@ -158,12 +161,31 @@ static void CreateAndSendSensorPayload()
             jw.insertKeyValue("air_purity", air_purity);
         }
 
-        Log.info("TCPClient connected");
         Log.info("ip address: %s", WiFi.localIP().toString().c_str());
         Log.info("gateway: %s", WiFi.gatewayIP().toString().c_str());
 
-        http_client.sendJson(jw);
+        http_client_dev.sendJson(jw);
     } else {
-        Log.error("http_client not connected to server");
+        Log.error("http_client_dev not connected to server");
+    }
+
+    if (http_client_prod.connected())
+    {
+        JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
+        {
+            JsonWriterAutoObject obj(&jw);
+            jw.insertKeyValue("temperature", temp);
+            jw.insertKeyValue("humidity", humidity);
+            jw.insertKeyValue("pressure", pressure);
+            jw.insertKeyValue("dust_concentration", dust_concentration);
+            jw.insertKeyValue("air_purity", air_purity);
+        }
+
+        Log.info("ip address: %s", WiFi.localIP().toString().c_str());
+        Log.info("gateway: %s", WiFi.gatewayIP().toString().c_str());
+
+        http_client_prod.sendJson(jw);
+    } else {
+        Log.error("http_client_prod not connected to server");
     }
 }
