@@ -16,6 +16,9 @@
 #include "Particle.h"
 #include "SeeedOLED.h"
 
+// Define DEV to point to development server
+#define DEV
+
 // This firmware works better with system thread enabled, otherwise it is not
 // initialized until you've already connected to the cloud, which is not as useful.
 SYSTEM_THREAD(ENABLED);
@@ -34,7 +37,7 @@ const byte prod_server[] = { 10, 0, 1, 2 };
 HttpClient http_client_dev(dev_server, 4000);
 HttpClient http_client_prod(prod_server, 4000);
 
-const unsigned long PUSH_SENSOR_DATA_INTERVAL = 5000; // milliseconds
+const unsigned long PUSH_SENSOR_DATA_INTERVAL = 10000; // milliseconds
 unsigned long lastPushSensorData = 0;
 float temp = 0, humidity = 0, dust_concentration = 0;
 int pressure = 0;
@@ -54,12 +57,12 @@ void setup() {
     SeeedOled.setNormalDisplay();
     SeeedOled.setPageMode();
 
-    http_client_dev.setEnpoint("/api/readings/add");
-    http_client_prod.setEnpoint("/api/readings/add");
-
     while (!WiFi.ready());
+#ifdef DEV
     http_client_dev.connect();
+#else
     http_client_prod.connect();
+#endif
 
     Log.info("Setup complete.");
 }
@@ -72,18 +75,21 @@ void loop() {
         ReadSensors();
         DisplayOledReadings();
         LogReadings();
+        SetReadingMetadata();
         CreateAndSendSensorPayload();
     }
 
+#ifdef DEV
     if (http_client_dev.available()) {
         const char c = http_client_dev.read();
         Serial.print(c);
     }
-
+#else
     if (http_client_prod.available()) {
         const char c = http_client_prod.read();
         Serial.print(c);
     }
+#endif
 }
 
 static void DisplayOledReadings()
@@ -143,12 +149,15 @@ static void ReadSensors()
 
 static void CreateAndSendSensorPayload()
 {
+#ifdef DEV
     if (!http_client_dev.connected())
         http_client_dev.connect();
-
+#else
     if (!http_client_prod.connected())
         http_client_prod.connect();
+#endif
 
+#ifdef DEV
     if (http_client_dev.connected())
     {
         JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
@@ -164,11 +173,12 @@ static void CreateAndSendSensorPayload()
         Log.info("ip address: %s", WiFi.localIP().toString().c_str());
         Log.info("gateway: %s", WiFi.gatewayIP().toString().c_str());
 
+        http_client_dev.setEnpoint("/api/readings/add");
         http_client_dev.sendJson(jw);
     } else {
         Log.error("http_client_dev not connected to server");
     }
-
+#else
     if (http_client_prod.connected())
     {
         JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
@@ -184,8 +194,57 @@ static void CreateAndSendSensorPayload()
         Log.info("ip address: %s", WiFi.localIP().toString().c_str());
         Log.info("gateway: %s", WiFi.gatewayIP().toString().c_str());
 
+        http_client_prod.setEnpoint("/api/readings/add");
         http_client_prod.sendJson(jw);
     } else {
         Log.error("http_client_prod not connected to server");
     }
+#endif
+}
+
+static void SetReadingMetadata()
+{
+#ifdef DEV
+    if (!http_client_dev.connected())
+        http_client_dev.connect();
+#else
+    if (!http_client_prod.connected())
+        http_client_prod.connect();
+#endif
+
+#ifdef DEV
+    if (http_client_dev.connected())
+    {
+        JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
+        {
+            JsonWriterAutoObject obj(&jw);
+            jw.insertKeyValue("timestamp_resolution_seconds", PUSH_SENSOR_DATA_INTERVAL / 1000);
+        }
+
+        Log.info("ip address: %s", WiFi.localIP().toString().c_str());
+        Log.info("gateway: %s", WiFi.gatewayIP().toString().c_str());
+
+        http_client_dev.setEnpoint("/api/reading_metadata/set");
+        http_client_dev.sendJson(jw);
+    } else {
+        Log.error("http_client_dev not connected to server");
+    }
+#else
+    if (http_client_prod.connected())
+    {
+        JsonWriterStatic<JSON_WRITER_BUFFER_SIZE> jw;
+        {
+            JsonWriterAutoObject obj(&jw);
+            jw.insertKeyValue("timestamp_resolution_seconds", PUSH_SENSOR_DATA_INTERVAL / 1000);
+        }
+
+        Log.info("ip address: %s", WiFi.localIP().toString().c_str());
+        Log.info("gateway: %s", WiFi.gatewayIP().toString().c_str());
+
+        http_client_prod.setEnpoint("/api/reading_metadata/set");
+        http_client_prod.sendJson(jw);
+    } else {
+        Log.error("http_client_prod not connected to server");
+    }
+#endif
 }
