@@ -1,6 +1,6 @@
 # sensorchi
 
-An IoT sensor platform based on the Particle IoT Air Quality Monitoring Kit.
+An IoT sensor platform based on the [Particle IoT Air Quality Monitoring Kit](https://store.particle.io/products/air-quality-monitoring-kit-wi-fi).
 
 ## Welcome to your project!
 
