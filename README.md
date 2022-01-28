@@ -2,6 +2,10 @@
 
 An IoT sensor platform based on the [Particle IoT Air Quality Monitoring Kit](https://store.particle.io/products/air-quality-monitoring-kit-wi-fi).
 
+## NOTE
+
+This repo is now deprecated as it's moved into a broader GitHub organization [now found here](https://github.com/Jim-Hodapp-Coaching/ambi_client_cpp).
+
 ## Welcome to your project!
 
 Every new Particle project is composed of 3 important elements that you'll see have been created in your project directory for sensorchi.
